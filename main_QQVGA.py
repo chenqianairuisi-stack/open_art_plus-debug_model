@@ -104,10 +104,10 @@ T_WALL  = (0, 100, -15, 37, -40, 6)      # 灰色墙壁 #
 TRACK_GREEN_MAIN = (73, 100, -96, -40, 8, 127)    # 纯绿部分--A≤-40 挡黄色（黄色 A≥-38），L 下探到 73、B 下探到 8 兜住降采样后偏暗的绿。
 TRACK_GREEN_CYAN = (65, 100, -74, -14, -80, 20)   # 青色部分--L 下探到 65、B 下探到 -80，QQVGA 青色更暗更蓝，这里是冷启动唯一锚点，必须放宽。
 TRACK_GREEN_THRESH = [TRACK_GREEN_MAIN, TRACK_GREEN_CYAN]
-# Lightweight constant-velocity Kalman filter for the QQVGA box center.
-# The measurement is still the detected blob centroid; the filter only models
-# temporal motion and does not change color segmentation or candidate ranking.
-GREEN_KALMAN_MEAS_NOISE_PX = 1.0       # centroid noise standard deviation (px)
+# QQVGA 车框中心使用轻量级的匀速 Kalman 滤波器。
+# 测量值仍然是检测到的 blob 质心；滤波器只对时间上的运动建模，
+# 不会改变颜色分割结果或候选目标的排序。
+GREEN_KALMAN_MEAS_NOISE_PX = 1.0       # 质心噪声标准差（像素）
 # 青色兜底帧的测量噪声：青块只是车身的一部分，它的质心天生偏离车身中心。
 # 给这种测量一个更大的噪声，卡尔曼就只会轻微修正，而不是把车身中心吸到青块上。
 GREEN_CYAN_ONLY_MEAS_NOISE_PX = 4.0
@@ -116,10 +116,10 @@ GREEN_CYAN_ONLY_MEAS_NOISE_PX = 4.0
 # 质心的 ±1px 噪声原样透传到画框和坐标上，就是框抖的根源之一。
 # 小车实际加速度远没有 600 px/s^2（≈12 m/s^2），180 足够跟上真实机动又能压住噪声。
 # 调大更跟手但更抖，调小更稳但快速变向时框会滞后。
-GREEN_KALMAN_ACCEL_NOISE_PX_S2 = 180.0  # expected unmodelled acceleration (px/s^2)
-GREEN_KALMAN_INIT_POS_NOISE_PX = 2.0   # initial position uncertainty (px)
-GREEN_KALMAN_INIT_SPEED_PX_S = 80.0    # initial speed uncertainty (px/s)
-GREEN_KALMAN_GATE_SIGMA = 4.0          # innovation gate in standard deviations
+GREEN_KALMAN_ACCEL_NOISE_PX_S2 = 180.0  # 未建模加速度的期望值（像素/秒²）
+GREEN_KALMAN_INIT_POS_NOISE_PX = 2.0   # 初始位置不确定度（像素）
+GREEN_KALMAN_INIT_SPEED_PX_S = 80.0    # 初始速度不确定度（像素/秒）
+GREEN_KALMAN_GATE_SIGMA = 4.0          # 创新门限的标准差倍数
 TRACK_MERGE_MARGIN = 1     # 绿/青两半之间的接缝桥接距离；青半+绿半紧挨着（缝 0~1px），1 就够桥住车内部。QQVGA 下绿黄在 A 轴重叠、切不干净，只要 margin≥2 就会顺着黄绿交界的绿 fringe 把黄块粘上来（12x17/12x27 竖长框就是这么来的），所以压到 1。
 GREEN_NEAR_BIAS = 0.12     # 多个候选时，偏向靠近上一帧中心的 blob 的程度--置信程度
 GREEN_CYAN_SCORE_BONUS = 80.0       # 青色是车身独有锚点；带青色的候选优先级更高，避免黄块边缘抢框。
@@ -574,7 +574,7 @@ class UltimateTracker:
         self.have_model_center = False
         self.model_cx = 0.0
         self.model_cy = 0.0
-        # Each axis stores [position, velocity, P00, P01, P11].
+        # 每个坐标轴保存 [位置、速度、P00、P01、P11]。
         self.kalman_x = [0.0, 0.0,
                          GREEN_KALMAN_INIT_POS_NOISE_PX * GREEN_KALMAN_INIT_POS_NOISE_PX,
                          0.0,
@@ -741,7 +741,7 @@ class UltimateTracker:
         return cx, cy
 
     def _kalman_predict_axis(self, state, dt):
-        # Constant-velocity prediction with white acceleration process noise.
+        # 使用白噪声加速度过程噪声进行匀速预测。
         dt = self._dt_num(dt)
         dt2 = dt * dt
         dt3 = dt2 * dt
@@ -805,8 +805,8 @@ class UltimateTracker:
         self.have_model_center = True
         return self.model_cx, self.model_cy
 
-    # Legacy first-order smoother retained for reference; the active path uses
-    # _kalman_predict_center() and _kalman_update_center().
+    # 保留旧的一阶平滑器作为参考；当前实际流程使用
+    # _kalman_predict_center() 和 _kalman_update_center()。
     def _axis_stabilize(self, last, target):
         # 单轴防抖：X / Y 各自独立判死区，互不影响。
         # 平移时，垂直于运动方向的那个轴只有阈值边缘 ±1px 的质心抖动，落在死区内就直接冻结；
